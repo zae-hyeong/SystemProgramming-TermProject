@@ -1,24 +1,13 @@
 /*
- * 1. 터미널의 왼쪽 벽에 유저, 오른쪽 벽에 보스 출력
- * 2. 왼쪽 공격 이미지 출력, 오른쪽 맞는 이미지 출력, 1초 sleep
- * 3. 오른쪽 체력 검사(0 이하라면 승리문구 후 종료)
- * 4. 왼쪽 맞는 이미지 출력, 오른쪽 공격 이미지 출력 1초 sleep
- * 5. 왼쪽 체력 검사 (0 이하라면 패배 문구 후 종료)
- * 2~5 반복
- *
- * 비고
- * #include <stdio.h>
- * spirntf(char[] , "%d", int) 로 정수를 int로
- *#include <stdlib.h>
-    int=atoi(char*);
- * child와 paret는 mutex를 공유하지 않는다.
- */
+  작성자: 201912325박찬규
+  내용: mutex 와 condition variable을 통하여 번갈아 실행되는 스레드 구현
+*/ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
-#include <fcntl.h> // 권한
+#include <fcntl.h>
 #include "overlap_codes.h"
 /*
  * argv[0] : "Boss_Stage_Process"
@@ -31,7 +20,7 @@ static pthread_cond_t lock_c = PTHREAD_COND_INITIALIZER;
 static int check_num =1 ;
 static int life=0;
 static int boss_life=0;
-
+//userThread가 실행할 함수
 static void *doUserCommand(void *arg)
 {	
    char ** info = (char**)arg;
@@ -45,20 +34,20 @@ static void *doUserCommand(void *arg)
    
    pthread_mutex_lock(&lock_m);
    while(1) {
-      while( check_num != 0 )
+      while( check_num != 0 )  // userThread의 차례까 아니라면 기다린다.
          pthread_cond_wait(&lock_c, &lock_m);
-      if( boss_life == 1 ) {
+      if( boss_life == 1 ) {  // 보스 몬스터가 체력이 0 이하라면 종료
          fprintf(stderr, "승리했습니다!!!");
          break;
       }
 
       fprintf(stderr, "보스에게 %d 피해를 입습니다!!\n", boss_power);
       health -= boss_power;
-      if(health <=0) {
-         life=1;
-	 check_num=1;
-	 fprintf(stderr, "패배했습니다....\n\n");
-	 pthread_cond_signal(&lock_c);
+      if(health <=0) {  // 캐릭터의 체력이 0 이하라면
+         life=1;  // 캐릭터가 죽음을 표시
+         check_num=1;  // bossThread가 실행할 수 있도록 함
+         fprintf(stderr, "패배했습니다....\n\n");
+         pthread_cond_signal(&lock_c);  // bossThread를 깨운다.
          break;
       }
       fprintf(stderr, "남은 체력 %d!!!!!\n\n\n", health);
@@ -76,7 +65,7 @@ static void *doUserCommand(void *arg)
    return NULL;
 	
 }
-
+// bossThread가 실행할 함수
 void *doBossCommand(void *arg)
 {
    int fd_boss_img = open("boss_img", O_RDWR |O_APPEND);
@@ -91,11 +80,11 @@ void *doBossCommand(void *arg)
    sleep(1);
    pthread_mutex_lock(&lock_m);
    while(1) {
-      while( check_num != 1 )
+      while( check_num != 1 )  // bossThread의 차례가 아니라면 기다린다.
          pthread_cond_wait(&lock_c, &lock_m);
-      if(life==1)
+      if(life==1)  // 캐릭터의 체력이 모두 떨어졌다면 종료한다.
          break;
-      for(i=0;i<300;i++) {
+      for(i=0;i<3;i++) {
          system("clear");
 	 printfmonster(fd_boss_img);
          lseek(fd_boss_img, (off_t)0, SEEK_SET);
@@ -107,15 +96,15 @@ void *doBossCommand(void *arg)
       boss_health-=power;
       fprintf(stderr, "보스 체력 %d!!!!!!\n\n", boss_health);
 
-      if(boss_health<=0) {
-	 boss_life=1;
-	 check_num=0;
-	 pthread_cond_signal(&lock_c);
+      if(boss_health<=0) {  // 보스몬스터의 체력 값이 0 이하라면
+	 boss_life=1;  // 보스 사망
+	 check_num=0; // userThread 가 실행될 수 있도록 함 
+	 pthread_cond_signal(&lock_c); // userThread를 깨운다.
          break;
       }
       sleep(1);
 
-      for(i=0;i<300;i++) {
+      for(i=0;i<3;i++) {
          system("clear");
 	 printfmonster(fd_boss_img);
          lseek(fd_boss_img, (off_t)0, SEEK_SET);
@@ -126,8 +115,8 @@ void *doBossCommand(void *arg)
       fprintf(stderr, "\n\n보스몬스터가 공격한다!!!\n\n");
       sleep(1);
 
-      check_num=0;
-      pthread_cond_signal(&lock_c);
+      check_num=0;  // userThread가 실행될 수 있도록 함
+      pthread_cond_signal(&lock_c); // userThread를 깨운다
    }
    pthread_mutex_unlock(&lock_m);
 

@@ -160,7 +160,7 @@ int SelectChar(int fd) {
                                         childpid = fork();
                                         if (childpid == -1) {
                                                 perror(" 보스 프로세스 부르기 실패");
-                                                exit(0); // 일단 강종으로
+                                                exit(0); //
 
                                         }
                                         // 보스 프로세스
@@ -182,11 +182,11 @@ int SelectChar(int fd) {
                                         childpid = fork();
                                         if (childpid == -1) {
                                                 perror(" 사냥 프로세스 부르기 실패");
-                                                exit(0); // 일단 강종으로
+                                                exit(0); // 
                                         }
                                         // 사냥 프로세스
                                         if(childpid == 0) {
-                                                execl("./hunt_process", NULL);
+                                                execl("./hunt_process", "hunt_process", NULL);
                                         }
                                         if (childpid != wait(NULL)) {
                                                 perror("메인 프로세스가 사냥  프로세스 기다리기 실패");
